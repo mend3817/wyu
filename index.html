@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>21點量化決策 Pro+ (加密戰情室)</title>
+<style>
+  :root {
+    --bg-main: #0B0E14;
+    --card-bg: #141A24;
+    --border-color: #242E3E;
+    --accent-green: #00FFAA;
+    --accent-blue: #00D8FF;
+    --accent-red: #FF4D4D;
+    --accent-yellow: #FFB300;
+  }
+  * { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background: var(--bg-main); 
+    color: #FFFFFF; 
+    margin: 0; 
+    padding: 8px 10px 20px 10px; 
+    touch-action: manipulation;
+  }
+  
+  #loginOverlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #07090D;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .login-card {
+    background: #111722;
+    border: 1.5px solid var(--accent-blue);
+    border-radius: 14px;
+    padding: 20px 16px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  .login-title { font-size: 1.15rem; font-weight: 900; color: var(--accent-green); margin-bottom: 6px; }
+  .login-desc { font-size: 0.75rem; color: #8FA3BF; margin-bottom: 14px; }
+  .login-input {
+    width: 100%;
+    background: #0B0E14;
+    border: 1px solid #33445C;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 1.1rem;
+    color: #FFF;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .login-input:focus { outline: none; border-color: var(--accent-green); box-shadow: 0 0 8px rgba(0,255,170,0.4); }
+  .login-btn {
+    width: 100%;
+    background: linear-gradient(90deg, #00875A, var(--accent-green));
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #07090D;
+    cursor: pointer;
+  }
+  .temp-code-box {
+    margin-top: 10px;
+    padding: 8px;
+    background: #182232;
+    border: 1px dashed var(--accent-yellow);
+    border-radius: 8px;
+    display: none;
+    text-align: left;
+  }
+  .temp-code-title { font-size: 0.7rem; color: var(--accent-yellow); font-weight: bold; margin-bottom: 6px; text-align: center; }
+  .temp-codes-grid { display: grid; grid-template-columns: 1fr; gap: 4px; }
+  .temp-code-item { background: #0B0E14; border: 1px solid #2B384E; border-radius: 6px; padding: 5px 8px; font-family: monospace; font-size: 0.95rem; font-weight: 900; color: #FFF; letter-spacing: 2px; text-align: center; display: flex; justify-content: space-between; align-items: center; }
+  .temp-code-item.used { color: #4B5768; text-decoration: line-through; border-color: #1C2433; }
+  .temp-code-status { font-size: 0.6rem; font-weight: normal; color: #8FA3BF; }
+
+  #appContainer { display: none; }
+
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .title { font-size: 1.0rem; font-weight: 900; color: var(--accent-green); letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; }
+  .header-actions { display: flex; gap: 4px; }
+  .btn-top-action { background: #1B2433; border: 1px solid var(--border-color); color: #BAC7D5; border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; cursor: pointer; font-weight: bold; }
+  .btn-top-action.matrix-btn { background: #012D21; border-color: #009647; color: #00FFAA; }
+
+  .rule-settings {
+    display: none;
+    background: #111620;
+    border: 1px solid #2B384E;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .rule-settings.open { display: grid; }
+  .rule-item { display: flex; justify-content: space-between; align-items: center; background: #18202E; padding: 4px 8px; border-radius: 4px; }
+  .rule-item select, .rule-item input { background: #0B0E14; color: #FFF; border: 1px solid #3B4B66; border-radius: 4px; padding: 2px 4px; font-size: 0.72rem; width: 80px; text-align: right; }
+
+  .shoe-bar-wrap { margin-bottom: 8px; }
+  .shoe-bar-info { display: flex; justify-content: space-between; font-size: 0.68rem; color: #6E829F; margin-bottom: 2px; }
+  .shoe-progress-bg { width: 100%; height: 5px; background: #18202E; border-radius: 3px; overflow: hidden; }
+  .shoe-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00D8FF, var(--accent-green)); transition: width 0.2s; }
+
+  .signal-box { border-radius: 10px; padding: 8px 10px; text-align: center; margin-bottom: 8px; font-weight: bold; font-size: 0.92rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .signal-neutral { background: #131822; color: #8FA3BF; border: 1px solid var(--border-color); }
+  .signal-green { background: #013318; color: #00FF88; border: 1px solid #009647; box-shadow: 0 0 16px rgba(0,255,136,0.3); }
+  .signal-red { background: #2B0D0D; color: #FF5A5A; border: 1px solid #631C1C; }
+  .signal-sub { font-size: 0.72rem; font-weight: normal; margin-top: 3px; display: block; opacity: 0.95; }
+
+  .index-play-box { background: #1F180B; border: 1px solid #704214; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.75rem; color: var(--accent-yellow); display: none; }
+  .index-play-box.active { display: block; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 8px; }
+  .stat-card { background: var(--card-bg); border-radius: 8px; padding: 6px 2px; text-align: center; border: 1px solid var(--border-color); }
+  .stat-label { font-size: 0.62rem; color: #6F829D; margin-bottom: 1px; }
+  .stat-value { font-size: 1.0rem; font-weight: 800; }
+
+  .mode-switch-bar { display: grid; grid-template-columns: 1fr 1fr; background: #0D1117; border: 1px solid #242E3E; border-radius: 8px; padding: 3px; margin-bottom: 8px; gap: 4px; }
+  .mode-tab { text-align: center; padding: 7px 4px; font-size: 0.75rem; font-weight: bold; color: #6F829D; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .mode-tab.shoe-active { background: #1B2433; color: var(--accent-green); border-color: #009647; }
+  .mode-tab.dealer-active { background: #2E200C; color: var(--accent-yellow); border-color: #C67D00; }
+
+  .grid-keypad-box { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+  .grid-keypad-title { font-size: 0.72rem; color: #8FA3BF; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .keypad-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 6px; }
+  .btn-grid-card {
+    background: #1B2433;
+    color: #FFFFFF;
+    border: 1px solid #2E3B50;
+    border-radius: 8px;
+    padding: 8px 1px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+  }
+  .btn-grid-card:active { background: #0066FF; transform: scale(0.94); }
+  .grid-card-val { font-size: 0.95rem; font-weight: 900; color: var(--accent-yellow); }
+  .grid-card-sub { font-size: 0.52rem; color: #8FA3BF; margin-top: 2px; }
+  .btn-burn-card { background: #221A11; border-color: #4A331A; }
+  .btn-burn-card .grid-card-val { color: #FF9F0A; }
+  .btn-reset-in-keypad { background: #2B1214; border-color: #5C2226; color: #FF5252; }
+  .btn-reset-in-keypad .grid-card-val { color: #FF5252; }
+
+  .dealer-panel { background: #141A24; border: 1px solid #2B384E; border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+  .dealer-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .dealer-panel-title { font-size: 0.78rem; font-weight: bold; color: var(--accent-yellow); display: flex; align-items: center; gap: 6px; }
+  .dealer-action-group { display: flex; gap: 4px; }
+  .btn-dealer-action { background: #1B2433; border: 1px solid #2E3B50; color: #BAC7D5; border-radius: 5px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; font-weight: bold; }
+  .btn-dealer-action.btn-plus { background: #33220B; border-color: #704214; color: var(--accent-yellow); }
+  .btn-dealer-action:active { transform: scale(0.92); }
+
+  .dealer-current-row { background: #0B0E14; border: 1px solid #222C3E; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; min-height: 38px; display: flex; align-items: center; }
+  .dealer-cards-flex { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .dealer-card-chip { background: #1C2433; border: 1px solid #33445C; color: var(--accent-yellow); padding: 3px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; cursor: pointer; position: relative; }
+  
+  .shoe-mode-locked .dealer-card-chip { cursor: default; background: #141A24; border-color: #242E3E; }
+  .shoe-mode-locked .dealer-card-chip:hover { border-color: #242E3E; background: #141A24; color: var(--accent-yellow); }
+  .shoe-mode-locked .dealer-card-chip:hover::after { content: none; }
+
+  .dealer-mode-locked .history-cell { cursor: default; }
+  .dealer-mode-locked .history-cell:hover { border-color: #242E3E; background: #141A24; color: var(--accent-yellow); }
+  .dealer-mode-locked .history-cell:hover::after { content: none; }
+
+  .dealer-card-chip:hover { border-color: var(--accent-red); background: #2B1214; color: #FF5252; }
+  .dealer-card-chip:hover::after { content: "×"; position: absolute; top: -4px; right: 2px; font-size: 0.7rem; color: #FF5252; }
+  
+  .dealer-history-list { display: flex; flex-direction: column; gap: 4px; max-height: 80px; overflow-y: auto; }
+  .dealer-history-row { background: #0D1117; border: 1px solid #1C2433; border-radius: 6px; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; }
+  .dh-round { color: #6F829D; font-weight: bold; }
+  .dh-cards { display: flex; gap: 3px; }
+  .dh-tag { background: #182232; color: #FFF; padding: 1px 5px; border-radius: 3px; font-size: 0.68rem; }
+
+  .history-panel { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+  .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.75rem; color: #8FA3BF; }
+  
+  .history-grid-box {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+    background: #0B0E14;
+    border: 1px solid #1C2433;
+    border-radius: 8px;
+    padding: 6px;
+    min-height: 50px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .history-cell {
+    background: #141A24;
+    border: 1px solid #242E3E;
+    border-radius: 5px;
+    height: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: bold;
+    color: var(--accent-yellow);
+    cursor: pointer;
+    position: relative;
+  }
+  .history-cell.burn-cell { color: #FF9F0A; border-color: #5C3D18; background: #2B1D0E; }
+  .history-cell:hover { border-color: var(--accent-red); background: #2B1214; color: #FF5252; }
+  .history-cell:hover::after { content: "×"; position: absolute; top: -4px; right: 2px; font-size: 0.7rem; color: #FF5252; }
+  .history-cell.empty { color: #2F3D52; font-size: 0.65rem; cursor: default; }
+</style>
+</head>
+<body class="shoe-mode-locked">
+
+<!-- 🔐 請輸入通關密語 -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-title">🔒 請輸入通關密語</div>
+    <div class="login-desc">請輸入主密碼或 6 位數臨時通行碼</div>
+    <input type="password" id="txtPassword" class="login-input" placeholder="••••••" onkeydown="if(event.key==='Enter') checkPassword()">
+    <button type="button" class="login-btn" onclick="checkPassword()">解鎖進入</button>
+    
+    <!-- 🔑 一次隨機產生的 5 組 6 位數臨時密碼顯示區 -->
+    <div id="tempCodeBox" class="temp-code-box">
+      <div class="temp-code-title">🎫 本次隨機產生 5 組單次通行碼 (各限用一次):</div>
+      <div id="tempCodesGrid" class="temp-codes-grid"></div>
+      <div style="font-size: 0.62rem; color: #8FA3BF; margin-top: 6px; text-align:center;">畫面將在 6 秒後進入戰情室...</div>
+    </div>
+
+    <div id="loginError" style="color:var(--accent-red); font-size:0.75rem; margin-top:8px; font-weight:bold;"></div>
+  </div>
+</div>
+
+<!-- ♠️ 主程式戰情室 -->
+<div id="appContainer">
+  <div class="header">
+    <div class="title" id="mainTitle">♠️ 21點量化決策 Pro+</div>
+    <div class="header-actions">
+      <button type="button" class="btn-top-action matrix-btn" onclick="openMatrixNewTab()">📊 策略表</button>
+      <button type="button" class="btn-top-action" onclick="toggleRules()" id="btnSettingsToggle">⚙️ 設定</button>
+    </div>
+  </div>
+
+  <!-- 🃏 主記牌操作區 -->
+  <div id="mainGameView">
+    <div id="ruleSettings" class="rule-settings">
+      <div class="rule-item" style="grid-column: span 2; background: #22180A; border: 1px solid #5C3D18;">
+        <span style="color:#FFB300; font-weight:bold;">💰 總本金金額 ($):</span>
+        <input type="number" id="cfgBankroll" value="10000" step="500" onchange="applyConfig()" style="width: 100px; color:#00FFAA; font-weight:bold;">
+      </div>
+      <div class="rule-item">
+        <span>牌靴副數:</span>
+        <select id="cfgDecks" onchange="applyConfig()">
+          <option value="8" selected>8 副</option>
+          <option value="6">6 副</option>
+          <option value="4">4 副</option>
+        </select>
+      </div>
+      <div class="rule-item">
+        <span>莊家軟17:</span>
+        <select id="cfgDealerSoft17" onchange="applyConfig()">
+          <option value="S17" selected>S17 (停牌)</option>
+          <option value="H17">H17 (要牌)</option>
+        </select>
+      </div>
+      <div class="rule-item">
+        <span>允許投降:</span>
+        <select id="cfgSurrender" onchange="applyConfig()">
+          <option value="Y" selected>允許投降 (LS)</option>
+          <option value="N">不可投降</option>
+        </select>
+      </div>
+      <div class="rule-item">
+        <span>分牌後加倍:</span>
+        <select id="cfgDAS" onchange="applyConfig()">
+          <option value="Y" selected>允許 DAS</option>
+          <option value="N">禁止 DAS</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="shoe-bar-wrap">
+      <div class="shoe-bar-info">
+        <span>牌靴滲透率: <b id="txtPenetration" style="color:#FFF;">0%</b></span>
+        <span>已消耗: <b id="txtDealtCards" style="color:#FFF;">0</b> / <span id="txtTotalCards">416</span> 張</span>
+      </div>
+      <div class="shoe-progress-bg">
+        <div id="shoeProgressFill" class="shoe-progress-fill"></div>
+      </div>
+    </div>
+
+    <div id="signalBox" class="signal-box signal-neutral">
+      ⚪ 旁觀等待 (下注 0)
+      <span class="signal-sub">真實點數 TC ≤ +1，無數學優勢，純記牌不下注</span>
+    </div>
+
+    <!-- ⚡ 動態偏差策略提示 (Index Plays) -->
+    <div id="indexPlayBox" class="index-play-box">
+      ⚡ <b id="indexTitle">偏差策略觸發</b>：<span id="indexDesc">當前真實點數已達到特定微調門檻。</span>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">流水數 (RC)</div>
+        <div id="valRC" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">真實點數 (TC)</div>
+        <div id="valTC" class="stat-value">+0.0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">即時 EV</div>
+        <div id="valEV" class="stat-value" style="color:#00D8FF;">-0.52%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">建議旁注</div>
+        <div id="valBet" class="stat-value" style="color:#8FA3BF;">0</div>
+      </div>
+    </div>
+
+    <!-- 🎛️ 輸入模式切換列 -->
+    <div class="mode-switch-bar">
+      <div id="tabShoe" class="mode-tab shoe-active" onclick="switchMode('shoe')">🃏 完整牌靴記牌</div>
+      <div id="tabDealer" class="mode-tab" onclick="switchMode('dealer')">🎯 點擊記莊家牌</div>
+    </div>
+
+    <!-- 🎲 方格網狀記牌面板（含洗牌按鈕在內） -->
+    <div class="grid-keypad-box">
+      <div class="grid-keypad-title">
+        <span id="keypadTitleText">🃏 快速記牌面板 (牌靴記牌模式)</span>
+        <span style="font-size: 0.65rem; color:#00FFAA;" id="keypadSubText">支援 2 ~ A 與 Ø 銷牌</span>
+      </div>
+      <div class="keypad-grid">
+        <div class="btn-grid-card" onclick="handlePadClick(2)"><div class="grid-card-val">2</div><div class="grid-card-sub" id="rem-2">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(3)"><div class="grid-card-val">3</div><div class="grid-card-sub" id="rem-3">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(4)"><div class="grid-card-val">4</div><div class="grid-card-sub" id="rem-4">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(5)"><div class="grid-card-val">5</div><div class="grid-card-sub" id="rem-5">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(6)"><div class="grid-card-val">6</div><div class="grid-card-sub" id="rem-6">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(7)"><div class="grid-card-val">7</div><div class="grid-card-sub" id="rem-7">剩 32</div></div>
+        
+        <div class="btn-grid-card" onclick="handlePadClick(8)"><div class="grid-card-val">8</div><div class="grid-card-sub" id="rem-8">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(9)"><div class="grid-card-val">9</div><div class="grid-card-sub" id="rem-9">剩 32</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(10)"><div class="grid-card-val">10</div><div class="grid-card-sub" id="rem-10">剩 128</div></div>
+        <div class="btn-grid-card" onclick="handlePadClick(1)"><div class="grid-card-val">A</div><div class="grid-card-sub" id="rem-1">剩 32</div></div>
+        <div class="btn-grid-card btn-burn-card" onclick="handleBurnClick()"><div class="grid-card-val">Ø</div><div class="grid-card-sub">銷牌</div></div>
+        <div class="btn-grid-card btn-reset-in-keypad" onclick="resetShoe()"><div class="grid-card-val">🔄</div><div class="grid-card-sub">洗牌</div></div>
+      </div>
+    </div>
+
+    <!-- 🎯 莊家手牌區塊 -->
+    <div class="dealer-panel">
+      <div class="dealer-panel-header">
+        <div class="dealer-panel-title">
+          <span id="dealerTitleText">莊家手牌 (牌靴模式已鎖定防誤觸)</span>
+          <span id="dealerSumBadge" style="font-size: 0.68rem; color:#8FA3BF; font-weight:normal;">Pts: 0</span>
+        </div>
+        <div class="dealer-action-group">
+          <button type="button" class="btn-dealer-action" onclick="clearCurrentDealer()" title="清除本局莊家牌">✕</button>
+          <button type="button" class="btn-dealer-action btn-plus" onclick="nextDealerRound()" title="進入下一局 (＋)">＋</button>
+        </div>
+      </div>
+      <div class="dealer-current-row">
+        <div id="dealerCurrentCards" class="dealer-cards-flex">
+          <span style="font-size: 0.72rem; color:#4B5768;">切換至 "🎯 點擊記莊家牌" 後點擊牌面輸入...</span>
+        </div>
+      </div>
+      <div id="dealerHistoryList" class="dealer-history-list">
+        <div style="font-size: 0.68rem; color:#4B5768; text-align:center; padding: 2px;">尚無過往莊家局數紀錄</div>
+      </div>
+    </div>
+
+    <!-- 🃏 牌靴軌跡紀錄面板 -->
+    <div class="history-panel" id="historyPanelBox">
+      <div class="history-header">
+        <span id="historyTitleText">📜 牌局記牌軌跡 (點擊任意牌可直接刪除)</span>
+      </div>
+      <div id="historyGrid" class="history-grid-box">
+        <div class="history-cell empty" style="grid-column: span 10; text-align:center;">尚無記錄，請點下方按鈕記牌</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MASTER_PASSWORD = "58821817";
+
+  function getActiveTempCodesObj() {
+    let raw = localStorage.getItem("bj_active_temp_codes_v2");
+    if (!raw) {
+      let codes = [];
+      for(let i=0; i<5; i++) {
+        codes.push({
+          code: Math.floor(100000 + Math.random() * 900000).toString(),
+          used: false
+        });
+      }
+      localStorage.setItem("bj_active_temp_codes_v2", JSON.stringify(codes));
+      return codes;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch(e) {
+      return [];
+    }
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    let loginTime = localStorage.getItem("bj_login_time");
+    let nowTime = new Date().getTime();
+    let isRefreshed = !sessionStorage.getItem("bj_session_active");
+
+    if (isRefreshed || !loginTime || (nowTime - parseInt(loginTime) >= 24 * 60 * 60 * 1000)) {
+      localStorage.removeItem("bj_login_time");
+      sessionStorage.removeItem("bj_session_active");
+      let pwdInput = document.getElementById("txtPassword");
+      if(pwdInput) pwdInput.focus();
+    } else {
+      document.getElementById("loginOverlay").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      initApp();
+    }
+  });
+
+  function renderTempCodesList(codesObj) {
+    let gridEl = document.getElementById("tempCodesGrid");
+    gridEl.innerHTML = codesObj.map((item, idx) => `
+      <div class="temp-code-item ${item.used ? 'used' : ''}">
+        <span>#${idx+1}: ${item.code}</span>
+        <span class="temp-code-status">${item.used ? '已使用' : '可用'}</span>
+      </div>
+    `).join("");
+  }
+
+  function checkPassword() {
+    let inputVal = document.getElementById("txtPassword").value.trim();
+    let errEl = document.getElementById("loginError");
+    let tempBox = document.getElementById("tempCodeBox");
+
+    let codesObj = getActiveTempCodesObj();
+
+    if (inputVal === MASTER_PASSWORD) {
+      // 重新產生 5 組全新的通行碼
+      let newCodes = [];
+      for(let i=0; i<5; i++) {
+        newCodes.push({
+          code: Math.floor(100000 + Math.random() * 900000).toString(),
+          used: false
+        });
+      }
+      localStorage.setItem("bj_active_temp_codes_v2", JSON.stringify(newCodes));
+
+      renderTempCodesList(newCodes);
+      tempBox.style.display = "block";
+      errEl.innerText = "";
+      
+      localStorage.setItem("bj_login_time", new Date().getTime().toString());
+      sessionStorage.setItem("bj_session_active", "true");
+
+      setTimeout(() => {
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appContainer").style.display = "block";
+        initApp();
+      }, 6000);
+      return;
+    }
+
+    // 檢查是否符合 5 組其中之一
+    let matchedIndex = -1;
+    for (let i = 0; i < codesObj.length; i++) {
+      if (codesObj[i].code === inputVal) {
+        matchedIndex = i;
+        break;
+      }
+    }
+
+    if (matchedIndex !== -1) {
+      if (codesObj[matchedIndex].used) {
+        errEl.innerText = `❌ 第 #${matchedIndex+1} 組臨時通行碼已經被使用過，已失效！`;
+        document.getElementById("txtPassword").value = "";
+        return;
+      }
+
+      codesObj[matchedIndex].used = true;
+      localStorage.setItem("bj_active_temp_codes_v2", JSON.stringify(codesObj));
+
+      localStorage.setItem("bj_login_time", new Date().getTime().toString());
+      sessionStorage.setItem("bj_session_active", "true");
+
+      document.getElementById("loginOverlay").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      initApp();
+      return;
+    }
+
+    errEl.innerText = "❌ 密碼錯誤，請重新輸入";
+    document.getElementById("txtPassword").value = "";
+    document.getElementById("txtPassword").focus();
+  }
+
+  let config = {
+    bankroll: 10000,
+    decks: 8,
+    dealerSoft17: "S17",
+    surrender: "Y",
+    das: "Y"
+  };
+
+  let historyStack = [];
+  let currentMode = 'shoe';
+  let currentDealerCards = [];
+  let dealerHistoryRounds = [];
+
+  function initApp() {
+    historyStack = [];
+    currentDealerCards = [];
+    dealerHistoryRounds = [];
+    updateUI();
+  }
+
+  function toggleRules() {
+    let el = document.getElementById("ruleSettings");
+    el.classList.toggle("open");
+  }
+
+  function openMatrixNewTab() {
+    let newWindow = window.open("", "_blank");
+    if (!newWindow) {
+      alert("⚠️ 瀏覽器攔截了彈出視窗，請允許此網站開啟新分頁！");
+      return;
+    }
+
+    let htmlContent = `<!DOCTYPE html>
+    <html lang="zh-TW">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>21點基本策略決策表</title>
+    <style>
+      body { background: #0B0E14; color: #FFF; font-family: sans-serif; padding: 12px; margin: 0; }
+      h2 { color: #00FFAA; font-size: 1.1rem; margin-bottom: 8px; }
+      .matrix-section-title { font-size: 0.85rem; font-weight: bold; color: #FFB300; margin: 12px 0 4px 0; }
+      .matrix-table { width: 100%; border-collapse: collapse; text-align: center; background: #0B0E14; border-radius: 6px; overflow: hidden; margin-bottom: 8px; font-size: 0.75rem; }
+      .matrix-table th, .matrix-table td { border: 1px solid #1E293B; padding: 5px 2px; }
+      .matrix-table th { background: #182232; color: #94A3B8; }
+      .m-cell { font-weight: bold; }
+      .m-h { color: #00FFAA; background: #013318; } 
+      .m-s { color: #FF4D4D; background: #2B0D0D; } 
+      .m-d { color: #FFB300; background: #33220B; } 
+      .m-p { color: #00D8FF; background: #0A2233; } 
+      .m-r { color: #A0ABBA; background: #1C2433; }
+    </style>
+    </head>
+    <body>
+      <h2>📊 21點量化決策策略表</h2>
+      <div class="matrix-section-title">硬點數表 (Hard Totals: 9 ~ 17+)</div>
+      <table class="matrix-table" id="tableHard"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table>
+      <div class="matrix-section-title">軟點數表 (Soft Totals: A,2 ~ A,7)</div>
+      <table class="matrix-table" id="tableSoft"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table>
+      <div class="matrix-section-title">分牌對子表 (Pair Splits)</div>
+      <table class="matrix-table" id="tablePair"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table>
+      <script>
+        function getHardAction(sum, d) {
+          if (sum >= 17) return 's';
+          if (sum === 16) return (d >= 7) ? 'r' : 's';
+          if (sum === 15) return (d >= 10) ? 'r' : ((d >= 2 && d <= 6) ? 's' : 'h');
+          if (sum === 14) return (d >= 2 && d <= 6) ? 's' : 'h';
+          if (sum === 13) return (d >= 2 && d <= 6) ? 's' : 'h';
+          if (sum === 12) return (d >= 4 && d <= 6) ? 's' : 'h';
+          if (sum === 11) return 'd';
+          if (sum === 10) return (d >= 2 && d <= 9) ? 'd' : 'h';
+          if (sum === 9) return (d >= 3 && d <= 6) ? 'd' : 'h';
+          return 'h';
+        }
+        function getSoftAction(sum, d) {
+          if (sum >= 8) return 's';
+          if (sum === 7) return (d >= 3 && d <= 6) ? 'd' : ((d === 2 || d === 7 || d === 8) ? 's' : 'h');
+          if (sum === 6) return (d >= 3 && d <= 6) ? 'd' : 'h';
+          if (sum === 5 || sum === 4) return (d >= 4 && d <= 6) ? 'd' : 'h';
+          return (d === 5 || d === 6) ? 'd' : 'h';
+        }
+        function getPairAction(p, d) {
+          if (p === 1 || p === 8) return 'p';
+          if (p === 10) return 's';
+          if (p === 9) return (d === 7 || d === 10 || d === 11) ? 's' : 'p';
+          if (p === 7) return (d >= 2 && d <= 7) ? 'p' : 'h';
+          if (p === 6) return (d >= 3 && d <= 6) ? 'p' : 'h';
+          if (p === 5) return (d >= 2 && d <= 9) ? 'd' : 'h';
+          if (p === 4) return (d === 5 || d === 6) ? 'p' : 'h';
+          if (p === 3 || p === 2) return (d >= 2 && d <= 7) ? 'p' : 'h';
+          return 'h';
+        }
+        function getActionLabel(code) {
+          switch(code) { case 'h': return '補'; case 's': return '停'; case 'd': return '加'; case 'r': return '投'; case 'p': return '分'; default: return code; }
+        }
+        let dealers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        let hHtml = "";
+        for (let sum = 9; sum <= 17; sum++) {
+          hHtml += "<tr><td style='background:#182232; font-weight:bold;'>" + (sum===17?"17+":sum) + "</td>";
+          for (let d of dealers) { let c = getHardAction(sum, d); hHtml += "<td class='m-cell m-" + c + "'>" + getActionLabel(c) + "</td>"; }
+          hHtml += "</tr>";
+        }
+        document.getElementById("tableHard").innerHTML += hHtml;
+
+        let sHtml = "";
+        for (let s = 2; s <= 7; s++) {
+          sHtml += "<tr><td style='background:#182232; font-weight:bold;'>A," + s + "</td>";
+          for (let d of dealers) { let c = getSoftAction(s, d); sHtml += "<td class='m-cell m-" + c + "'>" + getActionLabel(c) + "</td>"; }
+          sHtml += "</tr>";
+        }
+        document.getElementById("tableSoft").innerHTML += sHtml;
+
+        let pHtml = "";
+        let pairs = [2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
+        let names = {2:"2,2", 3:"3,3", 4:"4,4", 5:"5,5", 6:"6,6", 7:"7,7", 8:"8,8", 9:"9,9", 10:"10,10", 1:"A,A"};
+        for (let p of pairs) {
+          pHtml += "<tr><td style='background:#182232; font-weight:bold;'>" + names[p] + "</td>";
+          for (let d of dealers) { let c = getPairAction(p, d); pHtml += "<td class='m-cell m-" + c + "'>" + getActionLabel(c) + "</td>"; }
+          pHtml += "</tr>";
+        }
+        document.getElementById("tablePair").innerHTML += pHtml;
+      <\/script>
+    </body>
+    </html>`;
+
+    newWindow.document.write(htmlContent);
+    newWindow.document.close();
+  }
+
+  function switchMode(mode) {
+    currentMode = mode;
+    let tabShoe = document.getElementById("tabShoe");
+    let tabDealer = document.getElementById("tabDealer");
+    let titleEl = document.getElementById("keypadTitleText");
+    let subEl = document.getElementById("keypadSubText");
+    let historyPanelBox = document.getElementById("historyPanelBox");
+    let historyTitleText = document.getElementById("historyTitleText");
+    let dealerTitleText = document.getElementById("dealerTitleText");
+    let bodyEl = document.body;
+
+    if (mode === 'shoe') {
+      tabShoe.className = "mode-tab shoe-active";
+      tabDealer.className = "mode-tab";
+      titleEl.innerText = "🃏 快速記牌面板 (牌靴記牌模式)";
+      subEl.innerText = "支援 2 ~ A 與 Ø 銷牌";
+      subEl.style.color = "var(--accent-green)";
+      
+      bodyEl.classList.add("shoe-mode-locked");
+      bodyEl.classList.remove("dealer-mode-locked");
+      
+      historyTitleText.innerText = "📜 牌局記牌軌跡 (點擊任意牌可直接刪除)";
+      dealerTitleText.innerText = "莊家手牌 (牌靴模式已鎖定防誤觸)";
+    } else {
+      tabShoe.className = "mode-tab";
+      tabDealer.className = "mode-tab dealer-active";
+      titleEl.innerText = "🎯 莊家手牌面板 (點擊記錄莊家牌)";
+      subEl.innerText = "點擊下方數字同時記入莊家與牌靴";
+      subEl.style.color = "var(--accent-yellow)";
+      
+      bodyEl.classList.remove("shoe-mode-locked");
+      bodyEl.classList.add("dealer-mode-locked");
+      
+      historyTitleText.innerText = "📜 牌局記牌軌跡 (莊家模式已鎖定防誤觸)";
+      dealerTitleText.innerText = "莊家手牌 (點牌可單張刪除)";
+    }
+    updateDealerDisplay();
+    updateUI();
+  }
+
+  function handlePadClick(val) {
+    recordCard(val);
+    if (currentMode === 'dealer') {
+      currentDealerCards.push({ val: val, label: val === 1 ? "A" : (val === 10 ? "10" : val.toString()) });
+      updateDealerDisplay();
+    }
+  }
+
+  function handleBurnClick() {
+    if (currentMode === 'shoe') {
+      recordBurnCard();
+    } else {
+      alert("⚠️ 目前為「莊家手牌」模式，銷牌請先切回「完整牌靴記牌」模式！");
+    }
+  }
+
+  function recordCard(val) {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    let weight = (val >= 2 && val <= 6) ? 1 : ((val >= 7 && val <= 9) ? 0 : -1);
+    let label = val === 1 ? "A" : (val === 10 ? "10" : val.toString());
+    historyStack.push({ weight: weight, label: label, value: val, isBurn: false });
+    saveState();
+    updateUI();
+  }
+
+  function recordBurnCard() {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    historyStack.push({ weight: 0, label: "Ø", isBurn: true, count: 1 });
+    saveState();
+    updateUI();
+  }
+
+  function removeCardAt(index) {
+    if (currentMode === 'dealer') return;
+    if (index >= 0 && index < historyStack.length) {
+      historyStack.splice(index, 1);
+      saveState();
+      updateUI();
+    }
+  }
+
+  function removeDealerCardAt(index) {
+    if (currentMode === 'shoe') return;
+    if (index >= 0 && index < currentDealerCards.length) {
+      let removedCard = currentDealerCards[index];
+      currentDealerCards.splice(index, 1);
+      
+      for (let i = historyStack.length - 1; i >= 0; i--) {
+        if (!historyStack[i].isBurn && historyStack[i].value === removedCard.val) {
+          historyStack.splice(i, 1);
+          break;
+        }
+      }
+
+      saveState();
+      updateDealerDisplay();
+      updateUI();
+    }
+  }
+
+  function clearCurrentDealer() {
+    currentDealerCards = [];
+    updateDealerDisplay();
+  }
+
+  function nextDealerRound() {
+    if (currentDealerCards.length === 0) return;
+    let sum = getDealerHandSum(currentDealerCards);
+    if (sum < 17) {
+      if (!confirm(`⚠️ 目前莊家點數為 ${sum} 點（未滿 17 點）。確定要直接結算並進入下一局嗎？`)) {
+        return;
+      }
+    }
+    
+    dealerHistoryRounds.unshift({
+      roundNum: dealerHistoryRounds.length + 1,
+      cards: [...currentDealerCards],
+      sum: sum
+    });
+    if (dealerHistoryRounds.length > 5) dealerHistoryRounds.pop();
+    currentDealerCards = [];
+    updateDealerDisplay();
+    updateUI();
+  }
+
+  function getDealerHandSum(cards) {
+    let sum = 0;
+    let ace = 0;
+    for (let c of cards) {
+      if (c.val === 1) { ace++; sum += 11; }
+      else { sum += c.val; }
+    }
+    while (sum > 21 && ace > 0) { sum -= 10; ace--; }
+    return sum;
+  }
+
+  function updateDealerDisplay() {
+    let container = document.getElementById("dealerCurrentCards");
+    let badge = document.getElementById("dealerSumBadge");
+    
+    if (currentDealerCards.length === 0) {
+      container.innerHTML = '<span style="font-size: 0.72rem; color:#4B5768;">切換至 "🎯 點擊記莊家牌" 後點擊牌面輸入...</span>';
+      badge.innerText = "Pts: 0";
+    } else {
+      let sum = getDealerHandSum(currentDealerCards);
+      badge.innerText = `Pts: ${sum}` + (sum > 21 ? " (爆牌)" : "");
+      badge.style.color = sum > 21 ? "var(--accent-red)" : "var(--accent-green)";
+      container.innerHTML = currentDealerCards.map((c, idx) => `<div class="dealer-card-chip" onclick="removeDealerCardAt(${idx})" title="點擊刪除此張莊家牌">${c.label}</div>`).join("");
+    }
+
+    let historyContainer = document.getElementById("dealerHistoryList");
+    if (dealerHistoryRounds.length === 0) {
+      historyContainer.innerHTML = '<div style="font-size: 0.68rem; color:#4B5768; text-align:center; padding: 2px;">尚無過往莊家局數紀錄</div>';
+    } else {
+      historyContainer.innerHTML = dealerHistoryRounds.map(r => `
+        <div class="dealer-history-row">
+          <span class="dh-round">RND ${String(dealerHistoryRounds.length - r.roundNum + 1).padStart(2, '0')}</span>
+          <div class="dh-cards">${r.cards.map(c => `<span class="dh-tag">${c.label}</span>`).join("")}</div>
+          <span style="color:${r.sum > 21 ? 'var(--accent-red)' : 'var(--accent-yellow)'}; font-weight:bold;">Pts: ${r.sum}</span>
+        </div>
+      `).join("");
+    }
+  }
+
+  function resetShoe() {
+    if (confirm("確認換靴洗牌？計數數據將完全清空！")) {
+      historyStack = [];
+      currentDealerCards = [];
+      dealerHistoryRounds = [];
+      updateDealerDisplay();
+      saveState();
+      updateUI();
+    }
+  }
+
+  function applyConfig() {
+    let bInput = parseFloat(document.getElementById("cfgBankroll").value);
+    config.bankroll = isNaN(bInput) || bInput < 100 ? 10000 : bInput;
+    config.decks = parseInt(document.getElementById("cfgDecks").value);
+    config.dealerSoft17 = document.getElementById("cfgDealerSoft17").value;
+    config.surrender = document.getElementById("cfgSurrender").value;
+    config.das = document.getElementById("cfgDAS").value;
+    saveState();
+    updateUI();
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem("bj_pro_cfg_auth_v32", JSON.stringify(config));
+    } catch(e) {}
+  }
+
+  function updateUI() {
+    let totalCards = config.decks * 52;
+    let dealtCards = 0;
+    let runningCount = 0;
+    let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0};
+    let totalPerVal = config.decks * 4;
+
+    for (let item of historyStack) {
+      if (item.isBurn) {
+        dealtCards += item.count;
+      } else {
+        dealtCards += 1;
+        runningCount += item.weight;
+        if (item.value) { counts[item.value] = (counts[item.value] || 0) + 1; }
+      }
+    }
+
+    for (let v = 1; v <= 10; v++) {
+      let maxCount = (v === 10) ? (config.decks * 16) : totalPerVal;
+      let rem = Math.max(0, maxCount - (counts[v] || 0));
+      let el = document.getElementById(`rem-${v}`);
+      if (el) el.innerText = `剩 ${rem}`;
+    }
+
+    let remCards = Math.max(0, totalCards - dealtCards);
+    let remDecks = Math.max(0.5, (remCards / 52.0));
+    let trueCount = runningCount / remDecks;
+
+    let penetration = Math.min(100, Math.round((dealtCards / totalCards) * 100));
+    document.getElementById("txtPenetration").innerText = `${penetration}%`;
+    document.getElementById("txtDealtCards").innerText = dealtCards;
+    document.getElementById("txtTotalCards").innerText = totalCards;
+    document.getElementById("shoeProgressFill").style.width = `${penetration}%`;
+
+    let rcEl = document.getElementById("valRC");
+    rcEl.innerText = (runningCount > 0 ? "+" : "") + runningCount;
+    rcEl.style.color = runningCount > 0 ? "var(--accent-green)" : (runningCount < 0 ? "var(--accent-red)" : "#FFF");
+
+    let tcEl = document.getElementById("valTC");
+    tcEl.innerText = (trueCount > 0 ? "+" : "") + trueCount.toFixed(1);
+    tcEl.style.color = trueCount >= 2 ? "var(--accent-green)" : (trueCount < 0 ? "var(--accent-red)" : "#FFF");
+
+    let liveEV = -0.52 + (trueCount * 0.5);
+    let evEl = document.getElementById("valEV");
+    evEl.innerText = (liveEV > 0 ? "+" : "") + liveEV.toFixed(2) + "%";
+    evEl.style.color = liveEV > 0 ? "var(--accent-green)" : (liveEV < -1 ? "var(--accent-red)" : "#00D8FF");
+
+    let recBet = 0;
+    let bankroll = config.bankroll;
+    if (trueCount >= 4.0) recBet = Math.floor(bankroll * 0.10);
+    else if (trueCount >= 2.0) recBet = Math.floor(bankroll * 0.03);
+    else recBet = 0;
+
+    let betEl = document.getElementById("valBet");
+    betEl.innerText = recBet.toLocaleString();
+    betEl.style.color = recBet > 0 ? "var(--accent-green)" : "#8FA3BF";
+
+    // ⚡ 動態偏差策略（Index Plays）邏輯判斷與顯示
+    let indexBox = document.getElementById("indexPlayBox");
+    let indexDesc = document.getElementById("indexDesc");
+    let indexTitle = document.getElementById("indexTitle");
+
+    if (trueCount >= 3.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "🔥 TC 飆高 (黃金偏差啟動)";
+      indexDesc.innerText = "大牌豐沛！16 對 10 請改為【投降/停牌】；15 對 10 請改為【投降】。";
+    } else if (trueCount <= -2.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "🧊 TC 過低 (小牌氾濫)";
+      indexDesc.innerText = "莊家優勢擴大，12 對 3/2 請改為【要牌 (Hit)】，減少加倍。";
+    } else {
+      indexBox.className = "index-play-box";
+    }
+
+    let histContainer = document.getElementById("historyGrid");
+    if (historyStack.length === 0) {
+      histContainer.innerHTML = '<div class="history-cell empty" style="grid-column: span 10; text-align:center;">尚無記錄，請點下方按鈕記牌</div>';
+    } else {
+      let html = "";
+      for (let i = 0; i < historyStack.length; i++) {
+        let item = historyStack[i];
+        let cellClass = item.isBurn ? "history-cell burn-cell" : "history-cell";
+        html += `<div class="${cellClass}" onclick="removeCardAt(${i})" title="點擊刪除">${item.label}</div>`;
+      }
+      histContainer.innerHTML = html;
+      histContainer.scrollTop = histContainer.scrollHeight;
+    }
+
+    let recentRounds = dealerHistoryRounds.slice(0, 4);
+    let consecutiveSmallRoundsCount = 0;
+    for (let r of recentRounds) {
+      let smallCountInRound = r.cards.filter(c => c.val >= 2 && c.val <= 6).length;
+      if (r.cards.length >= 2 && smallCountInRound >= 2 && r.sum <= 21) {
+        consecutiveSmallRoundsCount++;
+      }
+    }
+
+    let box = document.getElementById("signalBox");
+    let insuranceAlert = trueCount >= 3.0 ? " ⚠️【莊 A 必買保險】" : "";
+
+    if (consecutiveSmallRoundsCount >= 2) {
+      box.className = "signal-box signal-red";
+      box.innerHTML = `🚨【宏觀風險：近期多局莊家連續補小牌未爆】<span class="signal-sub">牌靴大牌嚴重匱乏，近期連續多局陷阱局，建議：<b>強烈不宜下注 (下注 0)</b>${insuranceAlert}</span>`;
+    } else if (dealtCards < 26) {
+      box.className = "signal-box signal-neutral";
+      box.innerHTML = `⚪ 開局觀察期 (下注 0)<span class="signal-sub">出牌未滿半副，純記牌觀察，絕對不出手${insuranceAlert}</span>`;
+    } else if (trueCount >= 2.0) {
+      box.className = "signal-box signal-green";
+      box.innerHTML = `🟢【優勢翻正：旁注 $${recBet.toLocaleString()}】<span class="signal-sub">TC +${trueCount.toFixed(1)}，已具數學優勢，適度出手。${insuranceAlert}</span>`;
+    } else {
+      box.className = "signal-box signal-neutral";
+      box.innerHTML = `⚪ 旁觀等待 (下注 0)<span class="signal-sub">處於常規波動區間 (TC: ${trueCount.toFixed(1)})，嚴禁出手${insuranceAlert}</span>`;
+    }
+  }
+</script>
+
+</body>
+</html>
