@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>21點量化決策 Pro+ (加密戰情室)</title>
+<!-- 引入 PeerJS 實現點對點即時連動 -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root {
+    --bg-main: #0B0E14;
+    --card-bg: #141A24;
+    --border-color: #242E3E;
+    --accent-green: #00FFAA;
+    --accent-blue: #00D8FF;
+    --accent-red: #FF4D4D;
+    --accent-yellow: #FFB300;
+  }
+  * { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background: var(--bg-main); 
+    color: #FFFFFF; 
+    margin: 0; 
+    padding: 8px 10px 20px 10px; 
+    touch-action: manipulation;
+  }
+  
+  #loginOverlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #07090D;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .login-card {
+    background: #111722; border: 1.5px solid var(--accent-blue); border-radius: 14px;
+    padding: 20px 16px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  .login-title { font-size: 1.15rem; font-weight: 900; color: var(--accent-green); margin-bottom: 6px; }
+  .login-desc { font-size: 0.75rem; color: #8FA3BF; margin-bottom: 14px; }
+  .login-input {
+    width: 100%; background: #0B0E14; border: 1px solid #33445C; border-radius: 8px;
+    padding: 10px 12px; font-size: 1.1rem; color: #FFF; text-align: center; letter-spacing: 2px; margin-bottom: 10px;
+  }
+  .login-input:focus { outline: none; border-color: var(--accent-green); box-shadow: 0 0 8px rgba(0,255,170,0.4); }
+  .login-btn {
+    width: 100%; background: linear-gradient(90deg, #00875A, var(--accent-green)); border: none;
+    border-radius: 8px; padding: 10px; font-size: 0.95rem; font-weight: bold; color: #07090D; cursor: pointer;
+  }
+  .temp-code-box {
+    margin-top: 10px; padding: 8px; background: #182232; border: 1px dashed var(--accent-yellow);
+    border-radius: 8px; display: none; text-align: left;
+  }
+  .temp-code-title { font-size: 0.7rem; color: var(--accent-yellow); font-weight: bold; margin-bottom: 6px; text-align: center; }
+  .temp-codes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .temp-code-item {
+    background: #0B0E14; border: 1px solid #2B384E; border-radius: 6px; padding: 5px 6px;
+    font-family: monospace; font-size: 0.85rem; font-weight: 900; color: #FFF; letter-spacing: 1px;
+    text-align: center; display: flex; justify-content: space-between; align-items: center;
+  }
+  .temp-code-item.used { color: #4B5768; text-decoration: line-through; border-color: #1C2433; }
+  .temp-code-status { font-size: 0.55rem; font-weight: normal; color: #8FA3BF; }
+
+  #appContainer { display: none; }
+
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .title { font-size: 1.0rem; font-weight: 900; color: var(--accent-green); letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; }
+  .header-actions { display: flex; gap: 4px; }
+  .btn-top-action { background: #1B2433; border: 1px solid var(--border-color); color: #BAC7D5; border-radius: 6px; padding: 4px 8px; font-size: 0.7rem; cursor: pointer; font-weight: bold; }
+  .btn-top-action.matrix-btn { background: #012D21; border-color: #009647; color: #00FFAA; }
+  .btn-top-action.sync-btn { background: #1F280D; border-color: #A3B812; color: #FFEA00; }
+
+  /* 📡 即時連動對接面板 */
+  .sync-panel-box {
+    background: #111722;
+    border: 1px solid var(--accent-yellow);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    display: none;
+    font-size: 0.75rem;
+  }
+  .sync-panel-box.active { display: block; }
+  .sync-panel-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--accent-yellow); margin-bottom: 6px; align-items: center; }
+  .sync-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .sync-input { background: #0B0E14; border: 1px solid #3B4B66; border-radius: 4px; color: #FFF; padding: 4px 6px; width: 90px; text-align: center; font-weight: bold; letter-spacing: 1px; outline: none; }
+  .sync-action-btn { background: #1E293B; border: 1px solid #3B4B66; color: #FFF; padding: 4px 8px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.72rem; }
+  .sync-status-badge { font-weight: bold; color: #8FA3BF; }
+
+  .platform-switch-bar { display: grid; grid-template-columns: 1fr 1fr; background: #070A0F; border: 1px solid #1E293B; border-radius: 8px; padding: 3px; margin-bottom: 8px; gap: 4px; }
+  .platform-tab { text-align: center; padding: 6px 4px; font-size: 0.75rem; font-weight: bold; color: #6F829D; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .platform-tab.platform-active { background: #132438; color: var(--accent-blue); border-color: #009647; font-weight: 900; box-shadow: 0 0 8px rgba(0,216,255,0.2); }
+
+  .shoe-bar-wrap { margin-bottom: 8px; }
+  .shoe-bar-info { display: flex; justify-content: space-between; font-size: 0.68rem; color: #6E829F; margin-bottom: 2px; }
+  .shoe-progress-bg { width: 100%; height: 5px; background: #18202E; border-radius: 3px; overflow: hidden; }
+  .shoe-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00D8FF, var(--accent-green)); transition: width 0.2s; }
+
+  .signal-box { border-radius: 10px; padding: 8px 10px; text-align: center; margin-bottom: 8px; font-weight: bold; font-size: 0.92rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .signal-neutral { background: #131822; color: #8FA3BF; border: 1px solid var(--border-color); }
+  .signal-green { background: #013318; color: #00FF88; border: 1px solid #009647; box-shadow: 0 0 16px rgba(0,255,136,0.3); }
+  .signal-red { background: #2B0D0D; color: #FF5A5A; border: 1px solid #631C1C; }
+  .signal-sub { font-size: 0.72rem; font-weight: normal; margin-top: 3px; display: block; opacity: 0.95; }
+
+  .index-play-box { background: #1F180B; border: 1px solid #704214; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; font-size: 0.75rem; color: var(--accent-yellow); display: none; line-height: 1.4; }
+  .index-play-box.active { display: block; }
+
+  /* 4個數據並排欄位：本金擺第一個 */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+  .stat-card { background: var(--card-bg); border-radius: 8px; padding: 6px 2px; text-align: center; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .stat-label { font-size: 0.6rem; color: #6F829D; margin-bottom: 2px; }
+  .stat-value { font-size: 0.92rem; font-weight: 800; }
+
+  .bankroll-input-stat {
+    width: 90%;
+    background: #0B0E14;
+    color: var(--accent-green);
+    border: 1px solid #3B4B66;
+    border-radius: 4px;
+    padding: 2px 0;
+    font-size: 0.85rem;
+    font-weight: 900;
+    text-align: center;
+    outline: none;
+    letter-spacing: 0.5px;
+  }
+  .bankroll-input-stat:focus { border-color: var(--accent-green); box-shadow: 0 0 4px rgba(0,255,170,0.4); }
+
+  .bets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+  .bet-card { 
+    background: #101722; 
+    border: 1px solid #223248; 
+    border-radius: 8px; 
+    padding: 8px 6px; 
+    text-align: center; 
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.3); 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 70px;
+  }
+  .bet-card-main { border-color: #009647; background: #081B15; }
+  .bet-card-sub { border-color: #881B1B; background: #1C0808; }
+  .bet-title { font-size: 0.68rem; font-weight: bold; margin-bottom: 4px; }
+  .bet-val-large { font-size: 1.3rem; font-weight: 900; letter-spacing: 0.5px; flex: 1; display: flex; align-items: center; justify-content: center; }
+  .bet-sub-list { font-size: 0.85rem; font-weight: 900; color: #FF4D4D; display: flex; flex-direction: column; gap: 2px; justify-content: center; flex: 1; }
+
+  /* 左右容器獨立布局 */
+  .main-layout-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+
+  /* 左半邊：記牌器面板 */
+  .main-left-panel {
+    width: 50%;
+  }
+
+  .mode-switch-bar { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    background: #0D1117; 
+    border: 1px solid #242E3E; 
+    border-radius: 8px; 
+    padding: 3px; 
+    margin-bottom: 6px; 
+    gap: 4px; 
+  }
+  .mode-tab { text-align: center; padding: 6px 2px; font-size: 0.72rem; font-weight: bold; color: #6F829D; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .mode-tab.shoe-active { background: #1B2433; color: var(--accent-green); border-color: #009647; }
+  .mode-tab.dealer-active { background: #2E200C; color: var(--accent-yellow); border-color: #C67D00; }
+
+  .grid-keypad-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px;
+  }
+
+  .grid-keypad-title { font-size: 0.72rem; color: #8FA3BF; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+  
+  .keypad-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    grid-template-rows: repeat(4, 44px);
+    gap: 5px; 
+  }
+
+  .btn-grid-card { 
+    background: #1B2433; 
+    color: #FFFFFF; 
+    border: 1px solid #2E3B50; 
+    border-radius: 8px; 
+    height: 44px;
+    text-align: center; 
+    cursor: pointer; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .btn-grid-card:active { background: #0066FF; transform: scale(0.94); }
+  
+  .grid-card-val { font-size: 1.1rem; font-weight: 900; color: var(--accent-yellow); line-height: 1.1; }
+  .grid-card-sub { font-size: 0.58rem; color: #8FA3BF; margin-top: 1px; }
+  
+  /* A 牌紅色高亮 */
+  .btn-card-a .grid-card-val { color: var(--accent-red) !important; }
+
+  .btn-burn-card { background: #221A11; border-color: #4A331A; }
+  .btn-burn-card .grid-card-val { color: #FF9F0A; }
+  .btn-reset-in-keypad { background: #2B1214; border-color: #5C2226; color: #FF5252; }
+  .btn-reset-in-keypad .grid-card-val { color: #FF5252; }
+
+  /* 右半邊：字體全面放大（不影響左邊） */
+  .main-right-panel {
+    width: 50%;
+    height: 275px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .history-panel, .dealer-panel {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.75rem; color: #8FA3BF; font-weight: bold; }
+  
+  /* 7×7 網格軌跡：數字字體放大至 0.95rem (加粗) */
+  .history-grid-box {
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr); 
+    gap: 3px; 
+    background: #0B0E14; 
+    border: 1px solid #1C2433; 
+    border-radius: 6px; 
+    padding: 4px;
+    flex: 1;
+    overflow-y: auto; 
+    align-content: start;
+  }
+  .history-cell {
+    background: #141A24; border: 1px solid #242E3E; border-radius: 4px; height: 24px; display: flex; justify-content: center; align-items: center;
+    font-size: 0.95rem; font-weight: 900; color: var(--accent-yellow); cursor: pointer; position: relative; transition: all 0.2s;
+  }
+  .history-cell.burn-cell { color: #FF9F0A; border-color: #5C3D18; background: #2B1D0E; }
+  
+  .history-cell.latest-cell {
+    background: #8B0000 !important; border: 1px solid #FF4D4D !important; color: #FFFFFF !important;
+    box-shadow: 0 0 6px rgba(255, 77, 77, 0.6); font-weight: 900;
+  }
+  .history-cell.latest-cell.burn-cell { background: #7A2800 !important; border-color: #FF9F0A !important; color: #FFB300 !important; }
+
+  .history-cell:hover { border-color: var(--accent-red); background: #2B1214; color: #FF5252; }
+  .history-cell.empty { color: #2F3D52; font-size: 0.68rem; cursor: default; }
+
+  /* 莊家手牌面板字體放大 */
+  .dealer-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .dealer-panel-title { font-size: 0.8rem; font-weight: bold; color: var(--accent-yellow); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .dealer-action-group { display: flex; gap: 4px; }
+  .btn-dealer-action { background: #1B2433; border: 1px solid #2E3B50; color: #BAC7D5; border-radius: 5px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; cursor: pointer; font-weight: bold; }
+  .btn-dealer-action.btn-plus { background: #33220B; border-color: #704214; color: var(--accent-yellow); }
+  .btn-dealer-action:active { transform: scale(0.92); }
+
+  .dealer-current-row { 
+    background: #0B0E14; 
+    border: 1px solid #222C3E; 
+    border-radius: 6px; 
+    padding: 3px 6px; 
+    margin-bottom: 4px; 
+    height: 30px; 
+    max-height: 30px;
+    overflow-x: auto; 
+    overflow-y: hidden;
+    display: flex; 
+    align-items: center; 
+  }
+  .dealer-cards-flex { display: flex; gap: 3px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
+  .dealer-card-chip { background: #1C2433; border: 1px solid #33445C; color: var(--accent-yellow); padding: 1px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; flex-shrink: 0; }
+  
+  .shoe-mode-locked .dealer-card-chip { cursor: default; background: #141A24; border-color: #242E3E; }
+  .shoe-mode-locked .history-cell { cursor: default; }
+  .dealer-card-chip:hover { border-color: var(--accent-red); background: #2B1214; color: #FF5252; }
+  
+  /* 莊家過往歷史列表字體放大 */
+  .dealer-history-list { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 3px; 
+    flex: 1; 
+    overflow-y: auto; 
+    max-height: 65px;
+  }
+  .dealer-history-row { background: #0D1117; border: 1px solid #1C2433; border-radius: 4px; padding: 3px 6px; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; }
+  .dh-round { color: #6F829D; font-weight: bold; font-size: 0.78rem; }
+  .dh-cards { display: flex; gap: 3px; flex-wrap: wrap; }
+  .dh-tag { background: #182232; color: #FFF; padding: 2px 5px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; border: 1px solid #2B384E; }
+  .dh-tag:hover { background: #0066FF; border-color: #00D8FF; color: #FFF; }
+</style>
+</head>
+<body class="shoe-mode-locked">
+
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-title">🔒 請輸入通關密語</div>
+    <div class="login-desc">請輸入主密碼或 6 位數臨時通行碼</div>
+    <input type="password" id="txtPassword" class="login-input" placeholder="••••••" onkeydown="if(event.key==='Enter') checkPassword()">
+    <button type="button" class="login-btn" onclick="checkPassword()">解鎖進入</button>
+    
+    <div id="tempCodeBox" class="temp-code-box">
+      <div class="temp-code-title">🎫 本次隨機產生 6 組單次通行碼 (各限用一次):</div>
+      <div id="tempCodesGrid" class="temp-codes-grid"></div>
+      <div style="font-size: 0.62rem; color: #8FA3BF; margin-top: 6px; text-align:center;">畫面將在 6 秒後進入戰情室...</div>
+    </div>
+    <div id="loginError" style="color:var(--accent-red); font-size:0.75rem; margin-top:8px; font-weight:bold;"></div>
+  </div>
+</div>
+
+<div id="appContainer">
+  <div class="header">
+    <div class="title" id="mainTitle">♠️ 21點量化決策 Pro+</div>
+    <div class="header-actions">
+      <button type="button" class="btn-top-action sync-btn" onclick="toggleSyncPanel()">📡 即時連動</button>
+      <button type="button" class="btn-top-action matrix-btn" onclick="openMatrixNewTab()">📊 策略表</button>
+    </div>
+  </div>
+
+  <!-- 📡 即時連動對接面板 -->
+  <div id="syncPanel" class="sync-panel-box">
+    <div class="sync-panel-header">
+      <span>📡 即時雙機連動（一人輸入，兩人同步）</span>
+      <span id="syncStatus" class="sync-status-badge">⚪ 未連線</span>
+    </div>
+    <div class="sync-controls">
+      <button type="button" class="sync-action-btn" style="background:#013318; border-color:#009647; color:#00FF88;" onclick="createRoom()">➕ 創立房間(朋友點)</button>
+      <span>或</span>
+      <input type="text" id="txtRoomId" class="sync-input" placeholder="輸入房號" maxlength="6">
+      <button type="button" class="sync-action-btn" style="background:#0A2233; border-color:#00D8FF; color:#00D8FF;" onclick="joinRoom()">🔗 加入房間(看畫面)</button>
+    </div>
+  </div>
+
+  <div class="platform-switch-bar">
+    <div id="btnPlatformSA" class="platform-tab platform-active" onclick="setPlatform('SA')">🎰 SA 模式 (有投降)</div>
+    <div id="btnPlatformDB" class="platform-tab" onclick="setPlatform('DB')">🎲 DB 模式 (無投降)</div>
+  </div>
+
+  <div id="mainGameView">
+    <div class="shoe-bar-wrap">
+      <div class="shoe-bar-info">
+        <span>牌靴滲透率: <b id="txtPenetration" style="color:#FFF;">0%</b></span>
+        <span>已消耗: <b id="txtDealtCards" style="color:#FFF;">0</b> / <span id="txtTotalCards">416</span> 張</span>
+      </div>
+      <div class="shoe-progress-bg">
+        <div id="shoeProgressFill" class="shoe-progress-fill"></div>
+      </div>
+    </div>
+
+    <div id="signalBox" class="signal-box signal-neutral">
+      ⚪ 旁觀等待 (下注 0)
+      <span class="signal-sub">真實點數未達門檻，純記牌不下注</span>
+    </div>
+
+    <div id="indexPlayBox" class="index-play-box">
+      ⚡ <b id="indexTitle">偏差策略觸發</b>：<span id="indexDesc">當前真實點數已達到特定微調門檻。</span>
+    </div>
+
+    <!-- 4個數據並排欄位：本金擺第一個 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">💰 本金 ($)</div>
+        <input type="number" id="cfgBankroll" class="bankroll-input-stat" placeholder="輸入" step="500" oninput="applyConfig()">
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">流水數 (RC)</div>
+        <div id="valRC" class="stat-value">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">真實點數 (TC)</div>
+        <div id="valTC" class="stat-value">+0.0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">即時 EV</div>
+        <div id="valEV" class="stat-value" style="color:#00D8FF;">-0.52%</div>
+      </div>
+    </div>
+
+    <div class="bets-grid">
+      <div class="bet-card bet-card-main">
+        <div class="bet-title" style="color:#00FFAA;">💰 全額旁注 (100%)</div>
+        <div id="valBetMain" class="bet-val-large" style="color:#00FFAA;">$0</div>
+      </div>
+      <div class="bet-card bet-card-sub">
+        <div class="bet-title" style="color:#FF4D4D;">🛡️ 避險分注 (½ / ¼)</div>
+        <div id="valBetSubList" class="bet-sub-list">
+          <div>½ 半注 : $0</div>
+          <div>¼ 微注 : $0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 50/50 左右分欄結構 -->
+    <div class="main-layout-container">
+      
+      <!-- 左側 50%：模式按鈕 + 記牌面板 -->
+      <div class="main-left-panel">
+        <div class="grid-keypad-box">
+          <div class="mode-switch-bar">
+            <div id="tabShoe" class="mode-tab shoe-active" onclick="switchMode('shoe')">🃏 完整牌靴記牌</div>
+            <div id="tabDealer" class="mode-tab" onclick="switchMode('dealer')">🎯 點擊記莊家牌</div>
+          </div>
+
+          <div class="grid-keypad-title">
+            <span id="keypadTitleText">🃏 記牌面板</span>
+            <span style="font-size: 0.62rem; color:#00FFAA;" id="keypadSubText">支援 2~A 與 Ø 銷牌</span>
+          </div>
+
+          <!-- 3×4 網格 -->
+          <div class="keypad-grid">
+            <div class="btn-grid-card" onclick="handlePadClick(2)"><div class="grid-card-val">2</div><div class="grid-card-sub" id="rem-2">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(3)"><div class="grid-card-val">3</div><div class="grid-card-sub" id="rem-3">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(4)"><div class="grid-card-val">4</div><div class="grid-card-sub" id="rem-4">剩 32</div></div>
+            
+            <div class="btn-grid-card" onclick="handlePadClick(5)"><div class="grid-card-val">5</div><div class="grid-card-sub" id="rem-5">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(6)"><div class="grid-card-val">6</div><div class="grid-card-sub" id="rem-6">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(7)"><div class="grid-card-val">7</div><div class="grid-card-sub" id="rem-7">剩 32</div></div>
+            
+            <div class="btn-grid-card" onclick="handlePadClick(8)"><div class="grid-card-val">8</div><div class="grid-card-sub" id="rem-8">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(9)"><div class="grid-card-val">9</div><div class="grid-card-sub" id="rem-9">剩 32</div></div>
+            <div class="btn-grid-card" onclick="handlePadClick(10)"><div class="grid-card-val">10</div><div class="grid-card-sub" id="rem-10">剩 128</div></div>
+            
+            <!-- A 牌紅色高亮 -->
+            <div class="btn-grid-card btn-card-a" onclick="handlePadClick(1)"><div class="grid-card-val">A</div><div class="grid-card-sub" id="rem-1">剩 32</div></div>
+            <div class="btn-grid-card btn-burn-card" onclick="handleBurnClick()"><div class="grid-card-val">Ø</div><div class="grid-card-sub">銷牌</div></div>
+            <div class="btn-grid-card btn-reset-in-keypad" onclick="resetShoe()"><div class="grid-card-val">🔄</div><div class="grid-card-sub">洗牌</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側 50%：右上軌跡(7*7) + 右下莊家手牌 (大字體版) -->
+      <div class="main-right-panel">
+        
+        <!-- 1. 右上：牌局軌跡區塊 (7*7 大字體網格) -->
+        <div class="history-panel" id="historyPanelBox">
+          <div class="history-header"><span id="historyTitleText">📜 牌局軌跡(點牌刪除)</span></div>
+          <div id="historyGrid" class="history-grid-box">
+            <div class="history-cell empty" style="grid-column: span 7; text-align:center;">尚無記錄</div>
+          </div>
+        </div>
+
+        <!-- 2. 右下：莊家手牌區塊 (大字體、可滑動歷史) -->
+        <div class="dealer-panel">
+          <div class="dealer-panel-header">
+            <div class="dealer-panel-title">
+              <span id="dealerTitleText">🎯 莊家手牌</span><span id="dealerSumBadge" style="font-size: 0.75rem; color:#8FA3BF; font-weight:normal;">Pts: 0</span>
+            </div>
+            <div class="dealer-action-group">
+              <button type="button" class="btn-dealer-action btn-plus" onclick="nextDealerRound()" title="結算下一局">＋</button>
+            </div>
+          </div>
+          <div class="dealer-current-row">
+            <div id="dealerCurrentCards" class="dealer-cards-flex">
+              <span style="font-size: 0.72rem; color:#4B5768;">請切換模式記錄...</span>
+            </div>
+          </div>
+          <div id="dealerHistoryList" class="dealer-history-list">
+            <div style="font-size: 0.72rem; color:#4B5768; text-align:center; padding: 2px;">尚無過往紀錄</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const MASTER_PASSWORD = "58821817";
+  let config = { bankroll: 0, decks: 8, platform: "SA" };
+  let historyStack = [];
+  let currentMode = 'shoe';
+  let currentDealerCards = [];
+  let dealerHistoryRounds = [];
+
+  // 📡 PeerJS 即時連動相關變數
+  let peer = null;
+  let activeConn = null;
+
+  function toggleSyncPanel() {
+    let p = document.getElementById("syncPanel");
+    p.classList.toggle("active");
+  }
+
+  function createRoom() {
+    let randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    let peerId = "bj-room-" + randomCode;
+    let statusEl = document.getElementById("syncStatus");
+    
+    statusEl.innerText = "⏳ 建立房間中...";
+    peer = new Peer(peerId);
+
+    peer.on('open', (id) => {
+      statusEl.innerHTML = `🟢 房號: <b style="color:#00FFAA; font-size:0.9rem;">${randomCode}</b> (請朋友輸入此號)`;
+    });
+
+    peer.on('connection', (conn) => {
+      activeConn = conn;
+      statusEl.innerText = "🟢 朋友已連線 (雙機同步中)";
+      setupConnListeners(conn);
+      broadcastState(); // 連線成功立即廣播當前狀態
+    });
+
+    peer.on('error', (err) => {
+      alert("⚠️ 建立房間失敗，請重試！");
+      statusEl.innerText = "🔴 建立失敗";
+    });
+  }
+
+  function joinRoom() {
+    let inputCode = document.getElementById("txtRoomId").value.trim();
+    if (!inputCode) { alert("請輸入 4 位數房號！"); return; }
+    
+    let peerId = "bj-room-" + inputCode;
+    let statusEl = document.getElementById("syncStatus");
+    statusEl.innerText = "⏳ 連線中...";
+
+    peer = new Peer();
+    peer.on('open', () => {
+      let conn = peer.connect(peerId);
+      activeConn = conn;
+      conn.on('open', () => {
+        statusEl.innerText = `🟢 已成功連線至房號 ${inputCode}`;
+      });
+      setupConnListeners(conn);
+    });
+
+    peer.on('error', (err) => {
+      alert("⚠️ 連線失敗，請確認房號是否正確！");
+      statusEl.innerText = "🔴 連線失敗";
+    });
+  }
+
+  function setupConnListeners(conn) {
+    conn.on('data', (data) => {
+      if (data && data.type === 'SYNC_STATE') {
+        historyStack = data.state.historyStack || [];
+        currentDealerCards = data.state.currentDealerCards || [];
+        dealerHistoryRounds = data.state.dealerHistoryRounds || [];
+        if (data.state.config) {
+          config.bankroll = data.state.config.bankroll || 0;
+          config.platform = data.state.config.platform || "SA";
+          let bInput = document.getElementById("cfgBankroll");
+          if(bInput) bInput.value = config.bankroll > 0 ? config.bankroll : "";
+          setPlatform(config.platform);
+        }
+        updateDealerDisplay();
+        updateUI();
+      }
+    });
+  }
+
+  function broadcastState() {
+    if (activeConn && activeConn.open) {
+      activeConn.send({
+        type: 'SYNC_STATE',
+        state: {
+          historyStack: historyStack,
+          currentDealerCards: currentDealerCards,
+          dealerHistoryRounds: dealerHistoryRounds,
+          config: config
+        }
+      });
+    }
+  }
+
+  function getActiveTempCodesObj() {
+    let raw = localStorage.getItem("bj_active_temp_codes_v4");
+    if (!raw) {
+      let codes = [];
+      for(let i=0; i<6; i++) codes.push({ code: Math.floor(100000 + Math.random() * 900000).toString(), used: false });
+      localStorage.setItem("bj_active_temp_codes_v4", JSON.stringify(codes));
+      return codes;
+    }
+    try { return JSON.parse(raw); } catch(e) { return []; }
+  }
+
+  function loadGameState() {
+    let savedState = localStorage.getItem("bj_pro_gamestate_v4");
+    if (savedState) {
+      try {
+        let st = JSON.parse(savedState);
+        historyStack = st.historyStack || [];
+        currentDealerCards = st.currentDealerCards || [];
+        dealerHistoryRounds = st.dealerHistoryRounds || [];
+        config.bankroll = st.bankroll || 0;
+        config.platform = st.platform || "SA";
+        
+        let bInput = document.getElementById("cfgBankroll");
+        if(bInput) bInput.value = config.bankroll > 0 ? config.bankroll : "";
+        setPlatform(config.platform);
+      } catch(e) {}
+    } else {
+      document.getElementById("cfgBankroll").value = "";
+      config.bankroll = 0; config.platform = "SA"; historyStack = []; currentDealerCards = []; dealerHistoryRounds = [];
+      setPlatform("SA");
+    }
+  }
+
+  function saveGameState() {
+    let st = {
+      historyStack: historyStack,
+      currentDealerCards: currentDealerCards,
+      dealerHistoryRounds: dealerHistoryRounds,
+      bankroll: config.bankroll,
+      platform: config.platform
+    };
+    localStorage.setItem("bj_pro_gamestate_v4", JSON.stringify(st));
+    broadcastState(); // 資料有更動時，即時廣播給連線的另一方
+  }
+
+  function setPlatform(plat) {
+    config.platform = plat;
+    let btnSA = document.getElementById("btnPlatformSA");
+    let btnDB = document.getElementById("btnPlatformDB");
+    if (plat === 'SA') {
+      btnSA.className = "platform-tab platform-active";
+      btnDB.className = "platform-tab";
+    } else {
+      btnSA.className = "platform-tab";
+      btnDB.className = "platform-tab platform-active";
+    }
+    saveGameState();
+    updateUI();
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    let loginTime = localStorage.getItem("bj_login_time");
+    let nowTime = new Date().getTime();
+
+    if (!loginTime || (nowTime - parseInt(loginTime) >= 24 * 60 * 60 * 1000)) {
+      localStorage.removeItem("bj_login_time");
+      let pwdInput = document.getElementById("txtPassword");
+      if(pwdInput) pwdInput.focus();
+    } else {
+      document.getElementById("loginOverlay").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      initApp();
+    }
+  });
+
+  function renderTempCodesList(codesObj) {
+    let gridEl = document.getElementById("tempCodesGrid");
+    gridEl.innerHTML = codesObj.map((item, idx) => `
+      <div class="temp-code-item ${item.used ? 'used' : ''}">
+        <span>#${idx+1}: ${item.code}</span><span class="temp-code-status">${item.used ? '已用' : '可用'}</span>
+      </div>`).join("");
+  }
+
+  function checkPassword() {
+    let inputVal = document.getElementById("txtPassword").value.trim();
+    let errEl = document.getElementById("loginError");
+    let tempBox = document.getElementById("tempCodeBox");
+    let codesObj = getActiveTempCodesObj();
+
+    if (inputVal === MASTER_PASSWORD) {
+      let newCodes = [];
+      for(let i=0; i<6; i++) newCodes.push({ code: Math.floor(100000 + Math.random() * 900000).toString(), used: false });
+      localStorage.setItem("bj_active_temp_codes_v4", JSON.stringify(newCodes));
+      renderTempCodesList(newCodes);
+      tempBox.style.display = "block"; errEl.innerText = "";
+      localStorage.setItem("bj_login_time", new Date().getTime().toString());
+      setTimeout(() => {
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appContainer").style.display = "block"; initApp();
+      }, 6000);
+      return;
+    }
+
+    let matchedIndex = -1;
+    for (let i = 0; i < codesObj.length; i++) {
+      if (codesObj[i].code === inputVal) { matchedIndex = i; break; }
+    }
+
+    if (matchedIndex !== -1) {
+      if (codesObj[matchedIndex].used) {
+        errEl.innerText = `❌ 第 #${matchedIndex+1} 組臨時通行碼已被使用，已失效！`;
+        document.getElementById("txtPassword").value = ""; return;
+      }
+      codesObj[matchedIndex].used = true;
+      localStorage.setItem("bj_active_temp_codes_v4", JSON.stringify(codesObj));
+      localStorage.setItem("bj_login_time", new Date().getTime().toString());
+
+      document.getElementById("loginOverlay").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      initApp();
+      return;
+    }
+    errEl.innerText = "❌ 密碼錯誤，請重新輸入";
+    document.getElementById("txtPassword").value = ""; document.getElementById("txtPassword").focus();
+  }
+
+  function initApp() {
+    loadGameState();
+    updateUI();
+  }
+
+  function openMatrixNewTab() {
+    let newWindow = window.open("", "_blank");
+    if (!newWindow) { alert("⚠️ 瀏覽器攔截了彈出視窗，請允許此網站開啟新分頁！"); return; }
+    let htmlContent = `<!DOCTYPE html>
+    <html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>21點基本策略決策表</title><style>body{background:#0B0E14;color:#FFF;font-family:sans-serif;padding:12px;margin:0;} h2{color:#00FFAA;font-size:1.1rem;margin-bottom:8px;} .matrix-section-title{font-size:0.85rem;font-weight:bold;color:#FFB300;margin:12px 0 4px 0;} .matrix-table{width:100%;border-collapse:collapse;text-align:center;background:#0B0E14;border-radius:6px;overflow:hidden;margin-bottom:8px;font-size:0.75rem;} .matrix-table th, .matrix-table td{border:1px solid #1E293B;padding:5px 2px;} .matrix-table th{background:#182232;color:#94A3B8;} .m-cell{font-weight:bold;} .m-h{color:#00FFAA;background:#013318;} .m-s{color:#FF4D4D;background:#2B0D0D;} .m-d{color:#FFB300;background:#33220B;} .m-p{color:#00D8FF;background:#0A2233;} .m-r{color:#A0ABBA;background:#1C2433;}</style></head>
+    <body><h2>📊 21點量化決策策略表</h2><div class="matrix-section-title">硬點數表 (Hard Totals: 9 ~ 17+)</div><table class="matrix-table" id="tableHard"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table><div class="matrix-section-title">軟點數表 (Soft Totals: A,2 ~ A,7)</div><table class="matrix-table" id="tableSoft"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table><div class="matrix-section-title">分牌對子表 (Pair Splits)</div><table class="matrix-table" id="tablePair"><tr><th>手牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></table>
+    <script>
+      function getHardAction(sum,d){if(sum>=17) return 's';if(sum===16) return (d===9||d===10||d===11)?'r':((d>=2&&d<=6)?'s':'h');if(sum===15) return (d>=10)?'r':((d>=2&&d<=6)?'s':'h');if(sum===14) return (d>=2&&d<=6)?'s':'h';if(sum===13) return (d>=2&&d<=6)?'s':'h';if(sum===12) return (d>=4&&d<=6)?'s':'h';if(sum===11) return 'd';if(sum===10) return (d>=2&&d<=9)?'d':'h';if(sum===9) return (d>=3&&d<=6)?'d':'h';return 'h';}
+      function getSoftAction(sum,d){if(sum>=8)return 's';if(sum===7)return(d>=3&&d<=6)?'d':((d===2||d===7||d===8)?'s':'h');if(sum===6)return(d>=3&&d<=6)?'d':'h';if(sum===5||sum===4)return(d>=4&&d<=6)?'d':'h';return(d===5||d===6)?'d':'h';}
+      function getPairAction(p,d){if(p===1||p===8)return 'p';if(p===10)return 's';if(p===9)return(d===7||d===10||d===11)?'s':'p';if(p===7)return(d>=2&&d<=7)?'p':'h';if(p===6)return(d>=3&&d<=6)?'p':'h';if(p===5)return(d>=2&&d<=9)?'d':'h';if(p===4)return(d===5||d===6)?'p':'h';if(p===3||p===2)return(d>=2&&d<=7)?'p':'h';return 'h';}
+      function getActionLabel(code){switch(code){case 'h':return '補';case 's':return '停';case 'd':return '加';case 'r':return '投';case 'p':return '分';default:return code;}}
+      let dealers=[2,3,4,5,6,7,8,9,10,11],hHtml="";for(let sum=9;sum<=17;sum++){hHtml+="<tr><td style='background:#182232; font-weight:bold;'>"+(sum===17?"17+":sum)+"</td>";for(let d of dealers){let c=getHardAction(sum,d);hHtml+="<td class='m-cell m-"+c+"'>"+getActionLabel(c)+"</td>";}hHtml+="</tr>";}document.getElementById("tableHard").innerHTML+=hHtml;
+      let sHtml="";for(let s=2;s<=7;s++){sHtml+="<tr><td style='background:#182232; font-weight:bold;'>A,"+s+"</td>";for(let d of dealers){let c=getSoftAction(s,d);sHtml+="<td class='m-cell m-"+c+"'>"+getActionLabel(c)+"</td>";}hHtml+="</tr>";}document.getElementById("tableSoft").innerHTML+=sHtml;
+      let pHtml="",pairs=[2,3,4,5,6,7,8,9,10,1],names={2:"2,2",3:"3,3",4:"4,4",5:"5,5",6:"6,6",7:"7,7",8:"8,8",9:"9,9",10:"10,10",1:"A,A"};for(let p of pairs){pHtml+="<tr><td style='background:#182232; font-weight:bold;'>"+names[p]+"</td>";for(let d of dealers){let c=getPairAction(p,d);pHtml+="<td class='m-cell m-"+c+"'>"+getActionLabel(c)+"</td>";}hHtml+="</tr>";}document.getElementById("tablePair").innerHTML+=pHtml;
+    <\/script></body></html>`;
+    newWindow.document.write(htmlContent); newWindow.document.close();
+  }
+
+  function switchMode(mode) {
+    currentMode = mode;
+    let tabShoe = document.getElementById("tabShoe");
+    let tabDealer = document.getElementById("tabDealer");
+    let titleEl = document.getElementById("keypadTitleText");
+    let subEl = document.getElementById("keypadSubText");
+    let historyTitleText = document.getElementById("historyTitleText");
+    let bodyEl = document.body;
+
+    if (mode === 'shoe') {
+      tabShoe.className = "mode-tab shoe-active"; tabDealer.className = "mode-tab";
+      titleEl.innerText = "🃏 記牌面板 (牌靴模式)"; subEl.innerText = "支援 2~A 與 Ø 銷牌"; subEl.style.color = "var(--accent-green)";
+      bodyEl.classList.add("shoe-mode-locked"); bodyEl.classList.remove("dealer-mode-locked");
+      historyTitleText.innerText = "📜 牌局軌跡(點牌刪除)"; 
+    } else {
+      tabShoe.className = "mode-tab"; tabDealer.className = "mode-tab dealer-active";
+      titleEl.innerText = "🎯 莊家手牌面板 (點擊記莊家)"; subEl.innerText = "點擊數字同時記入莊家與牌靴"; subEl.style.color = "var(--accent-yellow)";
+      bodyEl.classList.remove("shoe-mode-locked"); bodyEl.classList.add("dealer-mode-locked");
+      historyTitleText.innerText = "📜 牌局軌跡(鎖定)"; 
+    }
+    updateDealerDisplay(); updateUI();
+  }
+
+  function handlePadClick(val) {
+    recordCard(val);
+    if (currentMode === 'dealer') { currentDealerCards.push({ val: val, label: val === 1 ? "A" : (val === 10 ? "10" : val.toString()) }); updateDealerDisplay(); saveGameState(); }
+  }
+
+  function handleBurnClick() {
+    if (currentMode === 'shoe') recordBurnCard();
+    else alert("⚠️ 目前為專門的莊家模式，銷牌請先切回完整牌靴模式！");
+  }
+
+  function recordCard(val) {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    let weight = (val >= 2 && val <= 6) ? 1 : ((val >= 7 && val <= 9) ? 0 : -1);
+    let label = val === 1 ? "A" : (val === 10 ? "10" : val.toString());
+    historyStack.push({ weight: weight, label: label, value: val, isBurn: false });
+    saveGameState(); updateUI();
+  }
+
+  function recordBurnCard() {
+    let totalCards = config.decks * 52;
+    if (historyStack.length >= totalCards) return;
+    historyStack.push({ weight: 0, label: "Ø", isBurn: true, count: 1 });
+    saveGameState(); updateUI();
+  }
+
+  function removeCardAt(index) {
+    if (currentMode === 'dealer') return;
+    if (index >= 0 && index < historyStack.length) { historyStack.splice(index, 1); saveGameState(); updateUI(); }
+  }
+
+  function removeDealerCardAt(index) {
+    if (currentMode === 'shoe') return;
+    if (index >= 0 && index < currentDealerCards.length) {
+      let removedCard = currentDealerCards[index];
+      currentDealerCards.splice(index, 1);
+      for (let i = historyStack.length - 1; i >= 0; i--) {
+        if (!historyStack[i].isBurn && historyStack[i].value === removedCard.val) { historyStack.splice(i, 1); break; }
+      }
+      saveGameState(); updateDealerDisplay(); updateUI();
+    }
+  }
+
+  function modifyDealerHistoryCard(roundIndex, cardIndex) {
+    let targetRound = dealerHistoryRounds[roundIndex];
+    if (!targetRound || !targetRound.cards[cardIndex]) return;
+
+    let oldCard = targetRound.cards[cardIndex];
+    let inputVal = prompt(`修改 RND ${dealerHistoryRounds.length - roundIndex} 中的牌 [${oldCard.label}]\n請輸入正確的牌面數字 (2~10 或 A):`, oldCard.label);
+    if (inputVal === null) return;
+
+    inputVal = inputVal.trim().toUpperCase();
+    let newVal = 0, newLabel = "";
+
+    if (inputVal === "A" || inputVal === "1") { newVal = 1; newLabel = "A"; }
+    else {
+      let num = parseInt(inputVal);
+      if (isNaN(num) || num < 2 || num > 10) {
+        alert("⚠️ 輸入格式錯誤！請輸入 2 到 10 之間的數字，或是 A。");
+        return;
+      }
+      newVal = num === 10 ? 10 : num;
+      newLabel = num.toString();
+    }
+
+    let foundInShoe = false;
+    for (let i = historyStack.length - 1; i >= 0; i--) {
+      if (!historyStack[i].isBurn && historyStack[i].value === oldCard.val) {
+        let weight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+        historyStack[i] = { weight: weight, label: newLabel, value: newVal, isBurn: false };
+        foundInShoe = true;
+        break;
+      }
+    }
+
+    if (!foundInShoe) {
+      let weight = (newVal >= 2 && newVal <= 6) ? 1 : ((newVal >= 7 && newVal <= 9) ? 0 : -1);
+      historyStack.push({ weight: weight, label: newLabel, value: newVal, isBurn: false });
+    }
+
+    targetRound.cards[cardIndex] = { val: newVal, label: newLabel };
+    targetRound.sum = getDealerHandSum(targetRound.cards);
+
+    saveGameState();
+    updateDealerDisplay();
+    updateUI();
+  }
+
+  function nextDealerRound() {
+    if (currentDealerCards.length === 0) return;
+    let sum = getDealerHandSum(currentDealerCards);
+    if (sum < 17 && !confirm(`⚠️ 目前莊家點數為 ${sum} 點（未滿 17 點）。確定要直接結算並進入下一局嗎？`)) return;
+    
+    dealerHistoryRounds.unshift({ cards: [...currentDealerCards], sum: sum });
+    if (dealerHistoryRounds.length > 20) dealerHistoryRounds.pop();
+    
+    currentDealerCards = []; saveGameState(); updateDealerDisplay(); updateUI();
+  }
+
+  function getDealerHandSum(cards) {
+    let sum = 0, ace = 0;
+    for (let c of cards) { if (c.val === 1) { ace++; sum += 11; } else { sum += c.val; } }
+    while (sum > 21 && ace > 0) { sum -= 10; ace--; }
+    return sum;
+  }
+
+  function updateDealerDisplay() {
+    let container = document.getElementById("dealerCurrentCards"), badge = document.getElementById("dealerSumBadge");
+    if (currentDealerCards.length === 0) {
+      container.innerHTML = '<span style="font-size: 0.72rem; color:#4B5768;">請切換模式記錄...</span>'; badge.innerText = "Pts: 0";
+    } else {
+      let sum = getDealerHandSum(currentDealerCards);
+      badge.innerText = `Pts: ${sum}` + (sum > 21 ? " (爆牌)" : ""); badge.style.color = sum > 21 ? "var(--accent-red)" : "var(--accent-green)";
+      container.innerHTML = currentDealerCards.map((c, idx) => `<div class="dealer-card-chip" onclick="removeDealerCardAt(${idx})" title="點擊刪除">${c.label}</div>`).join("");
+    }
+    
+    let historyContainer = document.getElementById("dealerHistoryList");
+    let totalRounds = dealerHistoryRounds.length;
+
+    if (totalRounds === 0) {
+      historyContainer.innerHTML = '<div style="font-size: 0.72rem; color:#4B5768; text-align:center; padding: 2px;">尚無過往紀錄</div>';
+    } else {
+      historyContainer.innerHTML = dealerHistoryRounds.map((r, rIdx) => {
+        let displayRoundNum = totalRounds - rIdx;
+        return `
+          <div class="dealer-history-row">
+            <span class="dh-round">RND ${String(displayRoundNum).padStart(2, '0')}</span>
+            <div class="dh-cards">${r.cards.map((c, cIdx) => `<span class="dh-tag" onclick="modifyDealerHistoryCard(${rIdx}, ${cIdx})" title="點擊修改這張牌">${c.label}</span>`).join("")}</div>
+            <span style="color:${r.sum > 21 ? 'var(--accent-red)' : 'var(--accent-yellow)'}; font-weight:bold;">Pts: ${r.sum}</span>
+          </div>`;
+      }).join("");
+    }
+  }
+
+  function resetShoe() {
+    if (confirm("確認換靴洗牌？計數數據與紀錄將完全清空！")) {
+      historyStack = []; 
+      currentDealerCards = []; 
+      dealerHistoryRounds = []; 
+      localStorage.removeItem("bj_pro_gamestate_v4");
+      saveGameState(); 
+      updateDealerDisplay(); 
+      updateUI();
+    }
+  }
+
+  function applyConfig() {
+    let bInput = parseFloat(document.getElementById("cfgBankroll").value);
+    config.bankroll = isNaN(bInput) || bInput <= 0 ? 0 : bInput;
+    saveGameState(); updateUI();
+  }
+
+  function updateUI() {
+    let totalCards = config.decks * 52;
+    let dealtCards = 0, runningCount = 0;
+    let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0};
+    let totalPerVal = config.decks * 4;
+
+    for (let item of historyStack) {
+      if (item.isBurn) { dealtCards += item.count; } 
+      else { dealtCards += 1; runningCount += item.weight; if (item.value) counts[item.value] = (counts[item.value] || 0) + 1; }
+    }
+
+    for (let v = 1; v <= 10; v++) {
+      let maxCount = (v === 10) ? (config.decks * 16) : totalPerVal;
+      let rem = Math.max(0, maxCount - (counts[v] || 0));
+      let el = document.getElementById(`rem-${v}`);
+      if (el) el.innerText = `剩 ${rem}`;
+    }
+
+    let remCards = Math.max(0, totalCards - dealtCards);
+    let remDecks = Math.max(0.5, (remCards / 52.0));
+    let trueCount = runningCount / remDecks;
+
+    let penetration = Math.min(100, Math.round((dealtCards / totalCards) * 100));
+    document.getElementById("txtPenetration").innerText = `${penetration}%`;
+    document.getElementById("txtDealtCards").innerText = dealtCards;
+    document.getElementById("txtTotalCards").innerText = totalCards;
+    document.getElementById("shoeProgressFill").style.width = `${penetration}%`;
+
+    let rcEl = document.getElementById("valRC");
+    rcEl.innerText = (runningCount > 0 ? "+" : "") + runningCount;
+    rcEl.style.color = runningCount > 0 ? "var(--accent-green)" : (runningCount < 0 ? "var(--accent-red)" : "#FFF");
+
+    let tcEl = document.getElementById("valTC");
+    tcEl.innerText = (trueCount > 0 ? "+" : "") + trueCount.toFixed(1);
+    tcEl.style.color = trueCount >= 2 ? "var(--accent-green)" : (trueCount < 0 ? "var(--accent-red)" : "#FFF");
+
+    let baseEV = (config.platform === 'SA') ? -0.52 : -0.68;
+    let liveEV = baseEV + (trueCount * 0.5);
+    let evEl = document.getElementById("valEV");
+    evEl.innerText = (liveEV > 0 ? "+" : "") + liveEV.toFixed(2) + "%";
+    evEl.style.color = liveEV > 0 ? "var(--accent-green)" : (liveEV < -1 ? "var(--accent-red)" : "#00D8FF");
+
+    let recent10 = dealerHistoryRounds.slice(0, 10);
+    let smallCardWin19to21Count = 0;
+    for (let r of recent10) {
+      if (r.cards && r.cards.length >= 3 && r.sum >= 19 && r.sum <= 21) {
+        smallCardWin19to21Count++;
+      }
+    }
+    let isAbnormalShoe = (dealerHistoryRounds.length >= 5 && smallCardWin19to21Count >= 3);
+
+    let recBet = 0;
+    let bankroll = config.bankroll;
+    let betMainEl = document.getElementById("valBetMain");
+    let betSubListEl = document.getElementById("valBetSubList");
+
+    let betThreshold = (config.platform === 'SA') ? 2.0 : 2.5;
+
+    if (bankroll <= 0) {
+      betMainEl.innerHTML = '$0<div style="font-size:0.6rem; color:#FF4D4D; font-weight:normal;">請輸入本金</div>';
+      betSubListEl.innerHTML = '<div>½ 半注 : $0</div><div>¼ 微注 : $0</div>';
+    } else {
+      if (trueCount >= betThreshold) {
+        let tcFloor = Math.floor(trueCount);
+        let betPercent = (tcFloor - 1) * 0.015;
+        betPercent = Math.min(betPercent, 0.5);
+        recBet = Math.floor(bankroll * betPercent);
+      }
+
+      if (recBet > 0) {
+        let halfBet = Math.floor(recBet / 2);
+        let quarterBet = Math.floor(recBet / 4);
+        
+        betMainEl.innerText = `$${recBet.toLocaleString()}`;
+        betSubListEl.innerHTML = `<div>½ 半注 : $${halfBet.toLocaleString()}</div><div>¼ 微注 : $${quarterBet.toLocaleString()}</div>`;
+      } else {
+        betMainEl.innerText = "$0";
+        betSubListEl.innerHTML = '<div>½ 半注 : $0</div><div>¼ 微注 : $0</div>';
+      }
+    }
+
+    let indexBox = document.getElementById("indexPlayBox");
+    let indexDesc = document.getElementById("indexDesc");
+    let indexTitle = document.getElementById("indexTitle");
+
+    let isSA = (config.platform === 'SA');
+    let surrenderText = isSA ? "投降/停牌" : "停牌 (DB無投降)";
+
+    if (trueCount >= 4.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "🔥 TC ≥ +4.0 (黃金偏差全面啟動)";
+      indexDesc.innerHTML = `• <b>莊 A 必買保險</b><br>• 10 對 10、10 對 A 請【加倍】<br>• 15 對 10、16 對 9/10 請【${surrenderText}】`;
+    } else if (trueCount >= 3.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "🔥 TC ≥ +3.0 (高優勢區間)";
+      indexDesc.innerHTML = `• <b>莊 A 必買保險</b><br>• 16 對 10、15 對 10 請【${surrenderText}】<br>• 9 對 7 請【加倍】`;
+    } else if (trueCount >= 2.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "📈 TC ≥ +2.0 (主力獲利區間)";
+      indexDesc.innerHTML = `• 12 對 4 改為【停牌】<br>• 15 對 9 請【${surrenderText}】<br>• 16 對 10 請【${surrenderText}】`;
+    } else if (trueCount >= 1.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "⚡ TC ≥ +1.0 (微偏差防守區間)";
+      indexDesc.innerHTML = `• 13 對 2/3 改為【停牌】<br>• 12 對 3 改為【停牌】<br>• 16 對 10 ${isSA ? '請【投降/要牌】' : '請【要牌】'}`;
+    } else if (trueCount <= -1.0) {
+      indexBox.className = "index-play-box active";
+      indexTitle.innerText = "🧊 TC ≤ -1.0 (小牌氾濫區間)";
+      indexDesc.innerHTML = "• 13 對 2 改為【要牌】<br>• 12 對 2/3 絕對要【要牌】<br>• 嚴禁加倍與分牌";
+    } else {
+      indexBox.className = "index-play-box";
+    }
+
+    let histContainer = document.getElementById("historyGrid");
+    if (historyStack.length === 0) {
+      histContainer.innerHTML = '<div class="history-cell empty" style="grid-column: span 7; text-align:center;">尚無記錄</div>';
+    } else {
+      let html = "";
+      let total = historyStack.length;
+      for (let i = 0; i < total; i++) {
+        let item = historyStack[i];
+        let isLatest = (i === total - 1);
+        let cellClass = "history-cell";
+        if (item.isBurn) cellClass += " burn-cell";
+        if (isLatest) cellClass += " latest-cell";
+        
+        html += `<div class="${cellClass}" onclick="removeCardAt(${i})" title="點擊刪除">${item.label}</div>`;
+      }
+      histContainer.innerHTML = html; 
+      histContainer.scrollTop = histContainer.scrollHeight;
+    }
+
+    let box = document.getElementById("signalBox");
+    let insuranceAlert = trueCount >= 3.0 ? " ⚠️【莊 A 必買保險】" : "";
+
+    if (isAbnormalShoe) {
+      box.className = "signal-box signal-red";
+      box.innerHTML = `🚨【智慧防護網：近 10 局出現 3 局以上小牌補至 19~21 點】<span class="signal-sub">偵測到莊家連續補牌異常，請謹慎評估下注風險！${insuranceAlert}</span>`;
+    } else if (dealtCards < 26) {
+      box.className = "signal-box signal-neutral";
+      box.innerHTML = `⚪ 開局觀察期 (下注 0)<span class="signal-sub">出牌未滿半副，純記牌觀察，絕對不出手${insuranceAlert}</span>`;
+    } else if (trueCount >= betThreshold && bankroll > 0) {
+      box.className = "signal-box signal-green";
+      box.innerHTML = `🟢【優勢翻正：旁注 $${recBet.toLocaleString()}】<span class="signal-sub">[${config.platform} 模式] TC +${trueCount.toFixed(1)}，已具數學優勢，適度出手。${insuranceAlert}</span>`;
+    } else if (trueCount >= betThreshold && bankroll <= 0) {
+      box.className = "signal-box signal-neutral";
+      box.innerHTML = `⚠️【尚未輸入本金】<span class="signal-sub">已有數學優勢，請於上方欄位輸入總本金。</span>`;
+    } else {
+      box.className = "signal-box signal-neutral";
+      box.innerHTML = `⚪ 旁觀等待 (下注 0)<span class="signal-sub">處於常規波動區間 (${config.platform}出手門檻 TC: +${betThreshold.toFixed(1)})，嚴禁出手${insuranceAlert}</span>`;
+    }
+  }
+</script>
+
+</body>
+</html>
